@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The bundle's Info.plist, as scripts/bundle.sh fills it in: @VERSION@ is the
+  version in Cargo.toml, and @MIN_OS@ the macOS version the release binary was
+  linked to run on.
+
+  LSUIElement keeps the app out of the Dock from the first moment. The app
+  hides its own Dock icon (fastframe_dock::set_dock_icon_visible(false), in
+  src/entrypoint.rs and src/app.rs) and never shows it; winit leaves the
+  activation policy alone in a bundle. Without LSUIElement, a bundled launch
+  would put the icon in the Dock until that call runs.
+
+  LSEnvironment puts MallocSpaceEfficient=1 into the environment of the process
+  that LaunchServices starts from this bundle. It is an undocumented flag of
+  libmalloc: man malloc does not list it. It makes malloc give memory back
+  sooner, so the Memory column of Activity Monitor (phys_footprint) falls in
+  every state of the app, and part of the fall after a close is pages in use
+  that the column stops counting. It costs a Temperature drag more frame CPU
+  and more CPU energy. A macOS may drop the flag, which returns the app to the
+  numbers it has without it, or change what it means; a Mac whose malloc is not
+  the one measured would read it all the same. Neither case was measured.
+
+  Only a launch by LaunchServices carries it: `cargo run` and the bare binary
+  run without it, and scripts/measure.sh adds it to what it starts (its
+  NO_LSENVIRONMENT opts out). This file is copied into every bundle by
+  scripts/bundle.sh, so it holds no figures, and they would go stale here.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>arrakis</string>
+	<key>CFBundleIconFile</key>
+	<string>Arrakis</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.zininyahor.arrakis</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Arrakis</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@VERSION@</string>
+	<key>LSEnvironment</key>
+	<dict>
+		<key>MallocSpaceEfficient</key>
+		<string>1</string>
+	</dict>
+	<key>LSMinimumSystemVersion</key>
+	<string>@MIN_OS@</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+</dict>
+</plist>

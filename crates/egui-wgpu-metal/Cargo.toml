@@ -1,0 +1,45 @@
+# egui's meshes through Metal, into surfaces of ours that a layer of the window's view shows. It takes
+# the name of the real egui-wgpu and the API eframe's wgpu integration calls, with no wgpu behind it:
+# the patch in the root's Cargo.toml puts it in that crate's place.
+[package]
+name = "egui-wgpu"
+version = "0.36.2"
+edition = "2024"
+rust-version = "1.98"
+license = "MIT"
+description = "egui's meshes through Metal, in place of egui-wgpu"
+publish = false
+
+[lib]
+name = "egui_wgpu"
+path = "src/lib.rs"
+
+# What eframe's own features ask of the real crate. Nothing here reads them.
+[features]
+default = []
+winit = []
+capture = []
+wayland = []
+x11 = []
+# What makes a failure on purpose, ARRAKIS_METAL_FAIL, and ARRAKIS_METAL_TEAR. The root's `demo` forwards
+# it, and no release build has it.
+demo = []
+
+# A default member builds on every target, so all of this is macOS's: elsewhere the crate compiles to
+# nothing, with no dependency (lib.rs).
+[target.'cfg(target_os = "macos")'.dependencies]
+egui = { version = "0.36.2", default-features = false }
+winit-crate = { package = "winit", version = "0.30.13", default-features = false, features = ["rwh_06"] }
+raw-window-handle = "0.6.2"
+log = "0.4"
+libc = "0.2.191"
+block2 = { version = "0.6.2", default-features = false, features = ["std"] }
+# `block2` for `DispatchData::from_static_bytes`, which hands `shader.metallib` to Metal.
+dispatch2 = { version = "0.3.1", default-features = false, features = ["std", "block2"] }
+objc2 = { version = "0.6.5", default-features = false, features = ["std"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSEnumerator", "NSError", "NSObjCRuntime", "NSPort", "NSRunLoop", "NSString"] }
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFBase", "CFCGTypes", "CFDictionary", "CFNumber", "CFRunLoop", "CFString", "block2", "objc2"] }
+objc2-quartz-core = { version = "0.3.2", default-features = false, features = ["std", "CADisplayLink", "CAFrameRateRange", "CALayer", "CATransaction", "CATransform3D", "objc2-core-foundation"] }
+objc2-io-surface = { version = "0.3.2", default-features = false, features = ["std", "IOSurfaceRef", "IOSurfaceTypes", "objc2-core-foundation", "objc2", "libc"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSResponder", "NSScreen", "NSView", "NSWindow", "objc2-core-foundation", "objc2-quartz-core"] }
+objc2-metal = { version = "0.3.2", default-features = false, features = ["std", "MTLAllocation", "MTLArgument", "MTLBuffer", "MTLCommandBuffer", "MTLCommandEncoder", "MTLCommandQueue", "MTLDevice", "MTLDrawable", "MTLLibrary", "MTLPixelFormat", "MTLRenderCommandEncoder", "MTLRenderPass", "MTLRenderPipeline", "MTLResource", "MTLSampler", "MTLStageInputOutputDescriptor", "MTLTexture", "MTLTypes", "block2", "dispatch2", "objc2-core-foundation", "objc2-io-surface"] }

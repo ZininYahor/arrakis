@@ -1,0 +1,236 @@
+# The painter is a member, in `default-members`, so that fmt, clippy and the tests
+# reach it.
+[workspace]
+members = ["crates/egui-wgpu-metal"]
+default-members = [".", "crates/egui-wgpu-metal"]
+
+[package]
+name = "arrakis"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "MIT"
+description = "Night Shift, but it means it: a schedule that turns the screen properly red"
+
+[lib]
+name = "arrakis"
+path = "src/lib.rs"
+
+[[bin]]
+name = "arrakis"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+# The whole UI. glow is the painter of every other platform and macOS's fallback
+# (a window there gets the Metal painter while it works: the macOS dependencies
+# and the patch below), and fastframe-shell needs it. No wgpu is built: the
+# Metal painter draws with Metal alone, and one small 2D window needs no more.
+# AccessKit connects the hand-drawn controls to VoiceOver. No default_fonts:
+# the window draws with San Francisco alone (src/theme.rs, `install`).
+eframe = { version = "0.36.2", default-features = false, features = ["accesskit", "glow"] }
+egui = { version = "0.36.2", default-features = false }
+# Local time for the schedule.
+jiff = "0.2"
+# The shared foundation of Spotifast (crmne/fastframe). Every crate comes
+# from the same tag; move them together.
+# Keeps the app running in the menu bar with no window, and builds a fresh
+# window on demand around eframe::run_native.
+fastframe-shell = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0" }
+# The menu-bar item and its menu.
+fastframe-tray = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0" }
+# The config folder.
+fastframe-dirs = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0" }
+# Settings are replaced whole (temporary file, fsync, rename) on a writer
+# thread, so a crash never leaves half a file and the UI never waits.
+fastframe-file = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0" }
+# One running copy: a second launch asks the first to show its window.
+fastframe-instance = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0" }
+# The log file and the panic log.
+fastframe-log = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0" }
+# The Mac's own San Francisco for the window, at the weights it uses. Without
+# its default `inter` feature: Inter's 880 KB stay out of the binary.
+fastframe-fonts = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0", default-features = false }
+# The window runs its header under the traffic lights: it drags the
+# window, and the lights sit centered in it.
+fastframe-titlebar = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0" }
+# Encodes the review screenshots; only in demo builds.
+png = { version = "0.18", optional = true }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+# Only macOS has the San Francisco that `theme::install` draws with. Every
+# other target compiles against the stub in src/gamma/unsupported.rs, and with
+# no `inter` feature there its window would have no font at all: Inter (880 KB)
+# is the face there. Cargo adds this entry's features to the one above, so the
+# macOS binary does not carry Inter.
+fastframe-fonts = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# eframe's wgpu seam, for the Metal painter that the patch below puts behind it.
+# Only macOS asks for it, so elsewhere eframe never asks for egui-wgpu, the patch
+# sits unused, and glow draws.
+eframe = { version = "0.36.2", default-features = false, features = ["wgpu_no_default_features"] }
+# The same crate that eframe links, named here only so that `demo` below can reach its `demo` feature: a
+# feature forwards to a direct dependency alone. The app goes on calling it as `eframe::egui_wgpu`, and
+# names `METAL_PAINTER` by that path, so the guard against a dropped patch still reads what eframe links.
+egui-wgpu = { version = "0.36.2", default-features = false }
+# Hides the Dock icon (the Accessory activation policy) for a menu-bar app.
+fastframe-dock = { git = "https://github.com/crmne/fastframe", tag = "v0.13.0" }
+# The displays' gamma tables (CGSetDisplayTransferByTable) and the display
+# reconfiguration callback. The servo core-graphics crate lacks both.
+objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGDirectDisplay", "CGDisplayConfiguration", "CGError"] }
+# The headless wait (src/idle.rs): AppKit's event loop until the tick's
+# deadline, the timer that ends it, and the main queue that a wake from any
+# thread cuts it short through. NSScreen gives the main screen's scale
+# before the first window exists (src/app.rs, `main_screen_scale`). NSView
+# and NSWindow turn off the closing window's animation (src/ui/appkit.rs),
+# whose view raw-window-handle reaches. NSOpenGL and NSGraphics make the
+# unseen window and context that let go of a closed window's last frame
+# (src/ui/appkit.rs, `release_closed_window`). NSUserDefaults, NSDictionary
+# and NSValue register the key that keeps AppKit's AutoFill helper from
+# starting (src/ui/appkit.rs, `skip_autofill_helper`). The Force Touch
+# trackpad's feedback (NSHapticFeedbackManager, src/haptics.rs), and the
+# monitor that tells a press on the trackpad from one on a mouse (NSEvent,
+# with a block). All already in the tree through eframe, glutin, winit, muda,
+# arboard, fastframe-tray and fastframe-titlebar, so the haptics, the flush and
+# the key add no crate to the build.
+dispatch2 = { version = "0.3.1", default-features = false, features = ["std"] }
+# The main-thread check of the haptics, too.
+objc2 = { version = "0.6.5", default-features = false, features = ["std"] }
+# The engine's notices from macOS (src/gamma/macos.rs, `watch_system`): the
+# wake, the user switch and the apps quitting from NSWorkspace, the clock and
+# the time zone from Foundation, each observed with a block, as is the
+# haptics' press monitor. block2 is already in the tree through
+# objc2-foundation.
+block2 = { version = "0.6.2", default-features = false, features = ["std"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSEvent", "NSGraphics", "NSGraphicsContext", "NSHapticFeedback", "NSOpenGL", "NSResponder", "NSScreen", "NSView", "NSWindow", "NSWorkspace", "block2", "objc2-core-foundation"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSDate", "NSDictionary", "NSGeometry", "NSTimer", "NSNotification", "NSOperation", "NSString", "NSTimeZone", "NSUserDefaults", "NSValue", "block2"] }
+raw-window-handle = "0.6.2"
+# The engine thread's QoS class (pthread_set_qos_class_self_np, src/engine.rs),
+# the driver's own memory footprint (proc_pid_rusage) in demo builds, and
+# dlopen and dlsym for the trackpad's private actuator (src/haptics.rs).
+# Already in the tree through other crates.
+libc = "0.2.191"
+
+[dev-dependencies]
+# The code-path benchmarks (benches/paths.rs). Four small crates; its clap,
+# libc and cfg-if are already in the tree. Its default feature only wraps
+# its help text, and would bring terminal_size and rustix.
+divan = { version = "0.1.21", default-features = false }
+
+[features]
+default = []
+# The screenshot, driver, diff and probe flags; never part of a release build. The Metal painter's
+# `demo` holds ARRAKIS_METAL_FAIL and ARRAKIS_METAL_TEAR.
+demo = ["dep:png", "egui-wgpu/demo"]
+
+[[bench]]
+name = "paths"
+harness = false
+required-features = ["demo"]
+
+[[test]]
+name = "drive"
+required-features = ["demo"]
+
+[[test]]
+name = "cover_counts"
+required-features = ["demo"]
+
+[[test]]
+name = "cover_builds"
+required-features = ["demo"]
+
+[[test]]
+name = "cover_prebuilt"
+required-features = ["demo"]
+
+[[test]]
+name = "cover_prebuilt_show"
+required-features = ["demo"]
+
+[[test]]
+name = "drag"
+required-features = ["demo"]
+
+[[test]]
+name = "drag_aim"
+required-features = ["demo"]
+
+[[test]]
+name = "drive_clock"
+required-features = ["demo"]
+
+[[test]]
+name = "drive_haptics"
+required-features = ["demo"]
+
+[[test]]
+name = "screen_counts"
+required-features = ["demo"]
+
+# Reads the icon's PNGs with the demo build's `diff::read`.
+[[test]]
+name = "bundle"
+required-features = ["demo"]
+
+# AppKit runs its event loop on the main thread only, and libtest's threads
+# are not it: this test is its own `main`.
+[[test]]
+name = "idle"
+harness = false
+
+# `gamma::watch_system` on the process's real notification centers, and the
+# notices ending the headless pump: the main thread's loop again.
+[[test]]
+name = "observers"
+harness = false
+
+# What the closed app keeps: the headless tick's timer and the release at a
+# close, on the main thread with no pool under them, as in the app.
+[[test]]
+name = "closed_keeps"
+harness = false
+required-features = ["demo"]
+
+# A failed Metal painter through a real shell: the flag is the process's, so this has a process of its own.
+[[test]]
+name = "painter_fallback"
+harness = false
+required-features = ["demo"]
+
+# scripts/measure/close-scan.py on pictures the test writes with the `png` crate, which only the demo
+# build brings in.
+[[test]]
+name = "close_captures_script"
+required-features = ["demo"]
+
+# Fat LTO takes 14% off the binary for 26 s more of a clean build, and every
+# benchmark stays within +5% (the worst, +2.1%). opt-level "s" and "z" shrink
+# it further but make the cover's layers 46% and 220% slower.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+# Immediate-mode layout is slow at opt-level 0. Keep dependencies optimized
+# while the app crate stays incremental.
+[profile.dev.package."*"]
+opt-level = 2
+
+[patch.crates-io]
+# crmne/winit apps-0.30 (Spotifast's pin): winit 0.30.13 plus two fixes a
+# menu-bar app needs and upstream has not merged: keeping the status item's
+# window alive when a window's event loop exits (winit#4754), and opening a
+# window after the app started with none (winit#4770). Without them the
+# menu-bar item stops answering after the first window closes.
+winit = { git = "https://github.com/crmne/winit", rev = "0bed9dc0a7db02590a279fb8bac795fa39ee6948" }
+# egui's meshes through Metal, behind eframe's wgpu seam, with no wgpu. Its version
+# must follow eframe's. On a mismatch cargo drops this with only a warning, so the
+# app names `egui_wgpu::METAL_PAINTER`, which the real crate does not have, and the
+# build stops.
+egui-wgpu = { path = "crates/egui-wgpu-metal" }

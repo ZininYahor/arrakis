@@ -1,0 +1,9 @@
+# What the crate's lints cannot see: `clippy::panic` does not read an assert, and a binding that returns a
+# bare `Retained` panics on nil. `-D warnings` in the clippy line stops on these. A new binding that asks
+# the system for a resource and panics on nil goes on the list.
+disallowed-macros = ["std::assert", "core::assert", "std::assert_eq", "core::assert_eq", "std::assert_ne", "core::assert_ne"]
+disallowed-methods = [
+  "core::cell::RefCell::borrow", "core::cell::RefCell::borrow_mut", "slice::copy_from_slice",
+  "objc2_metal::MTLCopyAllDevices", "objc2_app_kit::NSView::displayLinkWithTarget_selector",
+  "objc2_foundation::NSRunLoop::currentRunLoop", "objc2_foundation::NSPort::port",
+]

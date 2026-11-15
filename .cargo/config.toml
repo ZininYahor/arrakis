@@ -1,0 +1,9 @@
+# The oldest macOS the app runs on: 14, the owner's choice (2026-10-31).
+# Cargo hands [env] to every rustc and build script it runs, so the app, the
+# demo build, the tests, the fastframe crates and the winit patch all link
+# against it, on every target. `force` keeps a value the shell already set from
+# winning. scripts/bundle.sh reads the binary's `minos` for LSMinimumSystemVersion.
+# Cargo finds this file from its working directory, so only a build that starts
+# inside the repository has it: src/lib.rs stops any other build for macOS.
+[env]
+MACOSX_DEPLOYMENT_TARGET = { value = "14.0", force = true }
