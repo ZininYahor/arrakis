@@ -22,8 +22,27 @@ everything turns red: windows, video, even the cursor.
 
 ## Install
 
-You need macOS 14 or later, [Rust](https://rustup.rs) and the Xcode Command
-Line Tools.
+**With Homebrew**, on an Apple silicon Mac with macOS 15 or later:
+
+```sh
+brew install zininyahor/tap/arrakis
+ditto "$(brew --prefix arrakis)/Arrakis.app" /Applications/Arrakis.app
+```
+
+Homebrew builds Arrakis from source on your Mac. For the build it brings Rust
+and LLVM, about 2.2 GB, and keeps them while Arrakis is installed. Homebrew
+links its own `cargo` and `rustc` into its `bin`: if you have Rust of your own,
+check `which cargo`, and `brew unlink rust` takes Homebrew's out. To update,
+quit Arrakis, run `brew upgrade arrakis`, remove the old copy with
+`rm -rf /Applications/Arrakis.app`, then run the same `ditto` line: `ditto`
+merges into an old copy, and a file that the new version dropped would stay in
+the bundle and break its seal.
+
+On macOS 14 or an Intel Mac, Homebrew has no ready Rust (its bottles are for
+Apple silicon on macOS 15 and later), so build from source.
+
+**From source.** You need macOS 14 or later, [Rust](https://rustup.rs) and the
+Xcode Command Line Tools.
 
 ```sh
 git clone https://github.com/ZininYahor/arrakis
@@ -44,9 +63,11 @@ The Command Line Tools come with `xcode-select --install`. Arrakis is tested
 on macOS 26 on Apple silicon.
 
 `scripts/bundle.sh` builds the release binary and wraps it in
-`target/bundle/Arrakis.app`, with the app's icon, signed ad hoc. To update,
-quit Arrakis, pull, and run the same two commands again. On a Mac older than
-macOS 14 the script stops with a message before it builds or writes anything.
+`target/bundle/Arrakis.app`, with the app's icon, signed ad hoc. To update a
+build from source, quit Arrakis, pull, run `rm -rf /Applications/Arrakis.app`,
+then run the same two commands again.
+On a Mac older than macOS 14 the script stops with a message before it builds
+or writes anything.
 
 `cargo run --release` still works. It runs the bare binary, which has no icon
 of its own: macOS shows a generic executable icon for it. Only the bundle
@@ -155,6 +176,41 @@ debug level.
 - **Small**: a 4.8 MB binary in Rust, with no async runtime, no network and
   no telemetry.
 
+### Next to f.lux
+
+[f.lux 42.2 and Arrakis 0.1.0 on one Mac, each alone, at 1200 K, the window
+closed, 5 minutes at rest](scripts/measure/flux-compare.sh):
+
+|                         | Arrakis       | f.lux                   |
+|-------------------------|---------------|-------------------------|
+| Memory                  | 11.7-11.9 MiB | 33.2-34.5 MiB           |
+| CPU time                | 23-27 ms      | 324-337 ms              |
+| CPU energy              | 0.51-0.59 mJ  | 7.5-8.4 mJ              |
+| Interrupt wake-ups      | 118           | 315-320                 |
+| Window open             | 20.3-20.4 MiB | 29.0-29.2 MiB           |
+| Green, blue at 1200 K   | 31%, 0%       | 36%, 10%                |
+| Green, blue at pure red | 0%, 0%        | Darkroom, not read      |
+| Network                 | none linked   | update check, set daily |
+
+f.lux follows the sun where you live, has more modes (Darkroom among them),
+and runs on Macs back to macOS 10.9; Arrakis keeps a clock window and needs
+macOS 14.
+
+<details>
+<summary><b>How these were read</b></summary>
+
+On a MacBook Pro with an M1 Pro, macOS 26.6.2, on 16 November 2026. Each
+app alone, started by `open`, its window closed after 30 s, read from 90 s
+after the start for 5 minutes: three turns of f.lux and two of Arrakis,
+mostly in turns. The counters are `proc_pid_rusage`'s (CPU time, CPU energy,
+interrupt wake-ups, `phys_footprint`), and the display's table read back for
+the color. macOS's Bluetooth daemon held about one core all along, through
+every turn of both. "Network" is what each app links and what f.lux's
+settings ask for; no traffic was read. The tools are in `scripts/measure/`
+(`flux-compare.sh`, `rusagetool.c`, `tabledump.c`).
+
+</details>
+
 <details>
 <summary><b>How the color works</b></summary>
 
@@ -210,6 +266,16 @@ cargo run --features demo -- --demo-icon assets/icon.png
 ```
 
 </details>
+
+## Made with AI
+
+The code, the tests and this README were written by AI coding agents
+(Claude Code). The author directed the work: what the app does, how it looks,
+and which changes went in.
+
+Every change passed the test suite (more than 1000 tests) and a review, also
+by AI. No person has read every line. Arrakis changes your displays' color
+tables: it comes as it is, with no warranty (see the [license](LICENSE)).
 
 ## Known problems
 
